@@ -15,6 +15,9 @@ module tt_um_rejunity_vga_logo (
     input  wire       clk,      // clock
     input  wire       rst_n     // reset_n - low to reset
 );
+  // Suppress unused signals warning
+  wire _unused_ok = &{ena, ui_in, uio_in,
+                      sq0x_[17:16], sq0y_[17:16]};
 
   // VGA signals
   wire hsync;
@@ -47,10 +50,14 @@ module tt_um_rejunity_vga_logo (
   wire [9:0] x = x_px;
   wire [9:0] y = y_px;
 
-  wire [15:0] sq0x_; approx_signed_square #(9,3,3) sq0x(.a($signed(x_px) - 9'sd320), .p_approx(sq0x_));
-  wire [15:0] sq0y_; approx_signed_square #(9,4,3) sq0y(.a($signed(y_px) - 9'sd240), .p_approx(sq0y_));
+  wire signed [8:0] sx = $signed(x_px[8:0]);
+  wire signed [8:0] sy = $signed(y_px[8:0]);
 
-  wire [15:0] sqR = sq0x_ + sq0y_;
+  //wire [17:0] sq0x_; approx_signed_square #(9,3,3) sq0x(.a(sx - 9'sd320), .p_approx(sq0x_));
+  wire [17:0] sq0x_; approx_signed_square #(9,4,4) sq0x(.a(sx - 9'sd320), .p_approx(sq0x_));
+  wire [17:0] sq0y_; approx_signed_square #(9,4,3) sq0y(.a(sy - 9'sd240), .p_approx(sq0y_));
+
+  wire [15:0] sqR = sq0x_[15:0] + sq0y_[15:0];
   wire [15:0] r = sqR;
 
   // wire ring = (rx+ry) < 240*240 & (rx+ry) > (240-36)*(240-36);
