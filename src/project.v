@@ -16,8 +16,7 @@ module tt_um_rejunity_vga_logo (
     input  wire       rst_n     // reset_n - low to reset
 );
   // Suppress unused signals warning
-  wire _unused_ok = &{ena, ui_in, uio_in,
-                      sq0x_[17:16], sq0y_[17:16]};
+  wire _unused_ok = &{ena, ui_in, uio_in};
 
   // VGA signals
   wire hsync;
@@ -47,41 +46,13 @@ module tt_um_rejunity_vga_logo (
     .vpos(y_px)
   );
 
-  wire [9:0] x = x_px;
-  wire [9:0] y = y_px;
+  wire logo;
+  tt_logo tt_logo(
+    .x(x_px),
+    .y(y_px),
+    .logo(logo)
+  );
 
-  wire signed [8:0] sx = $signed(x_px[8:0]);
-  wire signed [8:0] sy = $signed(y_px[8:0]);
-
-  //wire [17:0] sq0x_; approx_signed_square #(9,3,3) sq0x(.a(sx - 9'sd320), .p_approx(sq0x_));
-  wire [17:0] sq0x_; approx_signed_square #(9,4,4) sq0x(.a(sx - 9'sd320), .p_approx(sq0x_));
-  wire [17:0] sq0y_; approx_signed_square #(9,4,3) sq0y(.a(sy - 9'sd240), .p_approx(sq0y_));
-
-  wire [15:0] sqR = sq0x_[15:0] + sq0y_[15:0];
-  wire [15:0] r = sqR;
-
-  // wire ring = (rx+ry) < 240*240 & (rx+ry) > (240-36)*(240-36);
-  wire ring = r < 238*238 & r > (238-36)*(238-36);
-
-  // xy: 46x100 wh:240x64
-  wire hat0 = x >= 80+46  & x < 80+46+240  & y >= 100 & y < 100+64;
-  // xy:144x100 wh:70x228
-  wire leg0 = x >= 80+144 & x < 80+144+70  & y >= 100 & y < 100+228;
-  // xy:144x222 wh:254x64
-  wire hat1 = x >= 80+144 & x < 80+144+254 & y >= 222 & y < 222+64;
-  // xy:256x222 wh:70x240
-  wire leg1 = x >= 80+256 & x < 80+256+70  & y >= 222 & y < 222+240;
-
-  // xy:(256+70)x(222+64) wh:20x...
-  wire cut0 = ~(x >= 80   & x < 80+144     & y >= 100+64 & y < 100+60+22);
-  // xy:(256+70)x(222+64) wh:20x...
-  wire cut1 = ~(x >= 80+256+70 & x < 80+256+70+22 & y >= 222+64 & y < 480);
-
-  // wire bg = y[5]^y[4]^y[3];//y[0]+y[1]+y[2]+y[3]+y[4]+y[5]+y[6]+y[7]+y[8] > 2;
-  // wire bg = acc[6]^flip;//(cc == 1)^flip;
-  // wire bg = line;
-
-  wire logo = (ring&cut0&cut1)|hat0|leg0|hat1|leg1;
   assign {R, G, B} = 
     ~activevideo ? 0 :
              logo ? 6'b00_00_00 : 6'b11_11_11;
@@ -98,6 +69,44 @@ module tt_um_rejunity_vga_logo (
 `endif
 endmodule
 
+
+// TODO: move into a separate logo.v file
+module tt_logo(
+  input wire [9:0] x,
+  input wire [9:0] y,
+  output wire logo
+);
+  wire signed [8:0] x_signed = $signed(x[8:0]);
+  wire signed [8:0] y_signed = $signed(y[8:0]);
+
+  //wire [17:0] sq0x_; approx_signed_square #(9,3,3) sq0x(.a(x_signed - 9'sd320), .p_approx(x_sq));
+  wire [17:0] x_sq; approx_signed_square #(9,4,4) sq0x(.a(x_signed - 9'sd320), .p_approx(x_sq));
+  wire [17:0] y_sq; approx_signed_square #(9,4,3) sq0y(.a(y_signed - 9'sd240), .p_approx(y_sq));
+
+  wire _unused_ok = &{x_sq[17:16], y_sq[17:16]};
+
+  wire [15:0] r_sq = x_sq[15:0] + y_sq[15:0];
+
+  // wire ring = (rx+ry) < 240*240 & (rx+ry) > (240-36)*(240-36);
+  wire ring = r_sq < 238*238 & r_sq > (238-36)*(238-36);
+
+  // xy: 46x100 wh:240x64
+  wire hat0 = x >= 80+46  & x < 80+46+240  & y >= 100 & y < 100+64;
+  // xy:144x100 wh:70x228
+  wire leg0 = x >= 80+144 & x < 80+144+70  & y >= 100 & y < 100+228;
+  // xy:144x222 wh:254x64
+  wire hat1 = x >= 80+144 & x < 80+144+254 & y >= 222 & y < 222+64;
+  // xy:256x222 wh:70x240
+  wire leg1 = x >= 80+256 & x < 80+256+70  & y >= 222 & y < 222+240;
+
+  // xy:(256+70)x(222+64) wh:20x...
+  wire cut0 = ~(x >= 80   & x < 80+144     & y >= 100+64 & y < 100+60+22);
+  // xy:(256+70)x(222+64) wh:20x...
+  wire cut1 = ~(x >= 80+256+70 & x < 80+256+70+22 & y >= 222+64 & y < 480);
+
+  assign logo = (ring&cut0&cut1)|hat0|leg0|hat1|leg1;
+endmodule
+
 module approx_signed_square #(
     parameter integer W = 12,
     parameter integer T = 4,  // truncate this many LSBs
@@ -105,7 +114,6 @@ module approx_signed_square #(
 )(
     input  wire signed [W-1:0] a,
     output wire [2*W-1:0] p_approx
-    // output wire signed [15:0] p_approx
 );
     // -------------------------
     // Guards
