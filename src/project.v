@@ -53,10 +53,78 @@ module tt_um_rejunity_vga_logo (
     .logo(logo)
   );
 
+  reg [9:0] y_prv;
+  reg [10:0] frame;
+  always @(posedge clk) begin
+    if (~rst_n) begin
+      frame <= 0;
+    end else begin
+      y_prv <= y_px;
+      if (y_px == 0 && y_prv != y_px) begin
+          frame <= frame + 1;
+      end
+    end
+  end
+
+  // Bayer dithering
+  // this is a 8x4 Bayer matrix which gets toggled every frame (so the other 8x4 elements are actually on odd frames)
+  wire [2:0] bayer_i = x_px[2:0] ^ {3{frame[0]}};
+  wire [1:0] bayer_j = y_px[1:0];
+  wire [2:0] bayer_x = {bayer_i[2], bayer_i[1]^bayer_j[1], bayer_i[0]^bayer_j[0]};
+  wire [4:0] bayer   = {bayer_x[0], bayer_i[0], bayer_x[1], bayer_i[1], bayer_x[2]};
+
+  // output dithered 2 bit color from 6 bit color and 5 bit Bayer matrix
+  function [1:0] dither2;
+    input [5:0] color6;
+    input [4:0] bayer5;
+    begin
+      dither2 = ({1'b0, color6} + {2'b0, bayer5} + color6[0] + color6[5] + color6[5:1]) >> 5;
+    end
+  endfunction
+
+  wire [1:0] r_dither = dither2(r, bayer);
+  wire [1:0] g_dither = dither2(g, bayer);
+  wire [1:0] b_dither = dither2(b, bayer);
+
+  function [17:0] rgb18;
+    input [5:0] rgb6;
+    begin
+      rgb18 = {rgb6[5:4], 4'b0, rgb6[3:2], 4'b0, rgb6[1:0], 4'b0};
+    end 
+  endfunction
+
+  function [17:0] rgb18_add;
+    input [17:0] rgb0;
+    input [17:0] rgb1;
+    begin
+      rgb18_add = {rgb0[17:11] + rgb1[17:11],
+                   rgb0[10: 6] + rgb1[10: 6],
+                   rgb0[ 5: 0] + rgb1[ 5: 0]};
+    end 
+  endfunction
+  
+  reg [17:0] bg;
+  wire [17:0] bg_inc = {6'b000_000, 6'b111_111, 6'b000_001};
+  always @(posedge clk) begin
+    if (~rst_n) begin
+      bg <= 0;
+    end else
+    if (x_px == 0) begin
+      if          (y_px == (480/4)*0) begin
+      end else if (y_px == (480/4)*1) begin
+      end else if (y_px == (480/4)*2) begin
+      end else if (y_px == (480/4)*3) begin
+      end else begin
+          bg <= rgb18_add(bg, bg_inc);
+      end
+    end
+  end
+
+  wire [5:0] r, g, b;
+  assign {r, g, b} = logo ? rgb18(63-2) : bg;
+
   assign {R, G, B} = 
-    ~activevideo ? 0 :
-             logo ? 6'b00_00_00 : 6'b11_11_11;
-             //   logo ? fg : bg;
+    ~activevideo ? 0 : { r_dither, g_dither, b_dither };
 
   // TinyVGA PMOD
 `ifdef VGA_REGISTERED_OUTPUTS
