@@ -2,6 +2,8 @@
 
 # Large procedural Tiny Tapeout logo (480x480) in Verilog with animations
 
+Related to my TT08 project: https://github.com/rejunity/tt08-huge-480x480-tiny-tapeout-logo-in-1-tile
+
 Working on it!
 
 <img width="1280" height="962" alt="image" src="https://github.com/user-attachments/assets/db59bf9f-4f93-4427-b136-bca6322738ba" /> 
