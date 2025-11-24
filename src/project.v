@@ -16,7 +16,7 @@ module tt_um_rejunity_vga_logo (
     input  wire       rst_n     // reset_n - low to reset
 );
   // Suppress unused signals warning
-  wire _unused_ok = &{ena, ui_in, uio_in};
+  wire _unused_ok = &{ena, ui_in[7:3], uio_in};
 
   // VGA signals
   wire hsync;
@@ -93,9 +93,9 @@ module tt_um_rejunity_vga_logo (
     end 
   endfunction
 
-  function [17:0] rgb18_add;
-    input [17:0] rgb0;
-    input [17:0] rgb1;
+  function signed [17:0] rgb18_add;
+    input signed [17:0] rgb0;
+    input signed [17:0] rgb1;
     begin
       rgb18_add = {rgb0[17:11] + rgb1[17:11],
                    rgb0[10: 6] + rgb1[10: 6],
@@ -103,27 +103,29 @@ module tt_um_rejunity_vga_logo (
     end 
   endfunction
   
-  reg [17:0] bg_at_y0;
-  reg [17:0] bg;
-  wire [17:0] bg_inc = {6'b000_000, 6'b111_111, 6'b000_001};
+  reg signed [17:0] bg_at_y0;
+  reg signed [17:0] bg_at_x0;
+  reg signed [17:0] bg;
+  // wire signed  [17:0] bg_inc = {6'b000_000, 6'b111_111, 6'b000_001};
+  wire signed [17:0] bg_inc = $signed({{5'b000_00, ~ui_in[2]} , 6'b111_111, 6'b000_001});
   always @(posedge clk) begin
     if (~rst_n) begin
-      bg_at_y0 <= 0;
+      bg_at_y0 <= bg_inc*640;
+      bg_at_x0 <= 0;
       bg <= 0;
     end else
     if (x_px == 0) begin
       if (y_px == 0) begin
-        bg <= bg_at_y0;
-        bg_at_y0 <= rgb18_add(bg_at_y0, -bg_inc*3);
-      end else
-        bg <= rgb18_add(bg, bg_inc);
-      
-      // if          (y_px == (480/4)*0) begin
-      // end else if (y_px == (480/4)*1) begin
-      // end else if (y_px == (480/4)*2) begin
-      // end else if (y_px == (480/4)*3) begin
-      // end else begin
-      // end
+        bg_at_x0 <= bg_inc*640 + bg_at_y0;
+        // bg_at_y0 <= rgb18_add(bg_at_y0, -bg_inc*3);
+        bg_at_y0 <= rgb18_add(bg_at_y0, -bg_inc*(ui_in[1:0] + 3'b1));
+      end else begin
+        // bg <= rgb18_add(bg, bg_inc);
+        bg_at_x0 <= rgb18_add(bg_at_x0, bg_inc);
+        bg <= bg_at_x0;
+      end
+    end else begin
+      bg <= rgb18_add(bg, bg_inc);
     end
   end
 
