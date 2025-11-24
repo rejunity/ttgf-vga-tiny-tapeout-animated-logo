@@ -103,20 +103,27 @@ module tt_um_rejunity_vga_logo (
     end 
   endfunction
   
+  reg [17:0] bg_at_y0;
   reg [17:0] bg;
   wire [17:0] bg_inc = {6'b000_000, 6'b111_111, 6'b000_001};
   always @(posedge clk) begin
     if (~rst_n) begin
+      bg_at_y0 <= 0;
       bg <= 0;
     end else
     if (x_px == 0) begin
-      if          (y_px == (480/4)*0) begin
-      end else if (y_px == (480/4)*1) begin
-      end else if (y_px == (480/4)*2) begin
-      end else if (y_px == (480/4)*3) begin
-      end else begin
-          bg <= rgb18_add(bg, bg_inc);
-      end
+      if (y_px == 0) begin
+        bg <= bg_at_y0;
+        bg_at_y0 <= rgb18_add(bg_at_y0, -bg_inc*3);
+      end else
+        bg <= rgb18_add(bg, bg_inc);
+      
+      // if          (y_px == (480/4)*0) begin
+      // end else if (y_px == (480/4)*1) begin
+      // end else if (y_px == (480/4)*2) begin
+      // end else if (y_px == (480/4)*3) begin
+      // end else begin
+      // end
     end
   end
 
